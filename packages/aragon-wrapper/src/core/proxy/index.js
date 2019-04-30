@@ -1,5 +1,5 @@
-import { fromEvent } from 'rxjs'
-import { filter } from 'rxjs/operators'
+import { fromEvent, from } from 'rxjs'
+import { filter, flatMap } from 'rxjs/operators'
 
 export default class Proxy {
   constructor (address, jsonInterface, web3, initializationBlock = 0) {
@@ -26,17 +26,20 @@ export default class Proxy {
 
     if (eventNames.length === 1) {
       // Get a specific event
-      return fromEvent(
-        this.contract.getPastEvents(eventNames[0], { fromBlock, toBlock }),
-        'data'
+      return from(
+        this.contract.getPastEvents(eventNames[0], { fromBlock, toBlock })
+      ).pipe(
+        // Convert single emission array to multiple emissions for every event
+        flatMap(pastEvents => from(pastEvents))
       )
     } else {
-      // Get all events the block range and filter
-      return fromEvent(
-        this.contract.getPastEvents('allEvents', { fromBlock, toBlock }),
-        'data'
+      // Get all events in the block range and filter
+      return from(
+        this.contract.getPastEvents('allEvents', { fromBlock, toBlock })
+          .then(events => events.map(event => eventNames.includes(event.event)))
       ).pipe(
-        filter((event) => eventNames.includes(event.event))
+        // Convert single emission array to multiple emissions for every event
+        flatMap(pastEvents => from(pastEvents))
       )
     }
   }
