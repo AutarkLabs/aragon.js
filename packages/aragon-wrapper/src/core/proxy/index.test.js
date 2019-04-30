@@ -167,3 +167,94 @@ test('should use the correct options for requested events', (t) => {
 
   eventEmitter.emit('data', { foo: 'bar' })
 })
+
+
+test('should use the correct options for requested past events with fromBlock and toBlock ', (t) => {
+  t.plan(2)
+  // arrange
+  const fromBlock = 10
+  const toBlock = 5
+  const eventEmitter = new EventEmitter()
+  const pastEventsStub = sinon.stub().returns(eventEmitter)
+
+  const contract = {
+    getPastEvents: pastEventsStub
+  }
+
+  const web3Stub = {
+    eth: {
+      Contract: sinon.stub().returns(contract)
+    }
+  }
+  const instance = new Proxy(null, null, web3Stub)
+  // act
+  const events = instance.pastEvents(null, { fromBlock, toBlock })
+  // assert
+  t.true(pastEventsStub.calledWithMatch('allEvents', { fromBlock, toBlock }))
+
+  events.subscribe(event => {
+    t.deepEqual(event, { foo: 'bar' })
+  })
+
+  eventEmitter.emit('data', { foo: 'bar' })
+})
+
+test('should use the correct options for requested past events with toBlock and initializationBlock set ', (t) => {
+  t.plan(2)
+  // arrange
+  const toBlock = 500
+  const initializationBlock = 20
+  const eventEmitter = new EventEmitter()
+  const pastEventsStub = sinon.stub().returns(eventEmitter)
+
+  const contract = {
+    getPastEvents: pastEventsStub
+  }
+
+  const web3Stub = {
+    eth: {
+      Contract: sinon.stub().returns(contract)
+    }
+  }
+  const instance = new Proxy(null, null, web3Stub, initializationBlock)
+  // act
+  const events = instance.pastEvents(null, { toBlock })
+  // assert
+  t.true(pastEventsStub.calledWithMatch('allEvents', { fromBlock: initializationBlock, toBlock }))
+
+  events.subscribe(event => {
+    t.deepEqual(event, { foo: 'bar' })
+  })
+
+  eventEmitter.emit('data', { foo: 'bar' })
+})
+
+test('should use the correct options for requested past events with single event filter', (t) => {
+  t.plan(3)
+  // arrange
+  const eventEmitter = new EventEmitter()
+  const pastEventsStub = sinon.stub().returns(eventEmitter)
+
+  const contract = {
+    getPastEvents: pastEventsStub
+  }
+
+  const web3Stub = {
+    eth: {
+      Contract: sinon.stub().returns(contract)
+    }
+  }
+  const instance = new Proxy(null, null, web3Stub)
+  // act
+  const events = instance.pastEvents(['Orange', 'Apple'])
+  // assert
+  t.true(pastEventsStub.calledWithMatch('allEvents', { fromBlock: 0, toBlock: null }))
+  // assert
+  events.subscribe(event => {
+    t.deepEqual(event.amount, 16)
+  })
+
+  eventEmitter.emit('data', { event: 'Orange', amount: 16 })
+  eventEmitter.emit('data', { event: 'Apple', amount: 16 })
+  eventEmitter.emit('data', { event: 'Pear', amount: 5 })
+})

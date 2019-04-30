@@ -12,6 +12,34 @@ export default class Proxy {
     this.initializationBlock = initializationBlock
   }
 
+  pastEvents (eventNames, { fromBlock = this.initializationBlock, toBlock = null } = {}) {
+    // Get all events
+    if (!eventNames) {
+      eventNames = ['allEvents']
+    }
+
+    // Convert `eventNames` to an array in order to
+    // support `.events(name)` and `.events([a, b])`
+    if (!Array.isArray(eventNames)) {
+      eventNames = [eventNames]
+    }
+
+    if (eventNames.length === 1) {
+      // Get a specific event
+      return fromEvent(
+        this.contract.getPastEvents(eventNames[0], { fromBlock, toBlock }),
+        'data'
+      )
+    } else {
+      // Get all events the block range and filter
+      return fromEvent(
+        this.contract.getPastEvents('allEvents', { fromBlock, toBlock }),
+        'data'
+      ).pipe(
+        filter((event) => eventNames.includes(event.event))
+      )
+    }
+  }
   // TODO: Make this a hot observable
   events (eventNames, options = { fromBlock: this.initializationBlock }) {
     // Get all events
