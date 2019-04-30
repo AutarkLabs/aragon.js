@@ -1,5 +1,5 @@
-import { defer, empty, from, merge } from 'rxjs'
-import { first, map, filter, pluck, switchMap, mergeScan, publishReplay } from 'rxjs/operators'
+import { combineLatest, defer, empty, from, merge } from 'rxjs'
+import { first, map, filter, pluck, switchMap, mergeScan, publishReplay, tap } from 'rxjs/operators'
 import Messenger, { providers } from '@aragon/rpc-messenger'
 
 export const AppProxyHandler = {
@@ -238,6 +238,7 @@ export class AppProxy {
    */
   store (reducer, events = [empty()]) {
     const initialState = this.state().pipe(first())
+    const latestBlock$ = this.web3Eth('getBlockNumber')
 
     // Wrap the reducer in another reducer that
     // allows us to execute code asynchronously
@@ -251,16 +252,22 @@ export class AppProxy {
         Promise.resolve(reducer(state, event))
       )
 
-    const store$ = initialState.pipe(
-      switchMap((initialState) =>
-        merge(
-          this.events(),
+    const store$ = combineLatest(initialState, latestBlock$).pipe(
+      switchMap(([initialState, latestBlock]) => {
+        const pastEvent$ = this.pastEvents(null, latestBlock)
+
+        pastEvent$.subscribe(v => { console.log(`pastEvent:`, v) })
+        return merge(
+          pastEvent$,
+          // this.events(latestBlock),
+          // this.events(),
           ...events
         ).pipe(
           mergeScan(wrappedReducer, initialState, 1),
+          tap((v) => console.log('woot state: ', v)),
           map((state) => this.cache('state', state))
         )
-      ),
+      }),
       publishReplay(1)
     )
     store$.connect()
