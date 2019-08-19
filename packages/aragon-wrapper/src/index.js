@@ -230,15 +230,15 @@ export default class Aragon {
     await this.cache.init()
     await this.kernelProxy.updateInitializationBlock()
     await this.initAccounts(options.accounts)
-    await this.initAcl(Object.assign({ aclAddress }, options.acl))
+    await this.initAcl(Object.assign({ aclAddress, cacheBlockHeight }, options.acl))
     await this.initIdentityProviders()
     this.initApps()
     this.initForwarders()
     this.initAppIdentifiers()
     this.initNetwork()
     this.initNotifications()
+    this.initForwardedActions({ cacheBlockHeight })
     this.initAppMetadata({ cacheBlockHeight })
-    this.initForwardedActions()
     this.trigger = new Subject()
     this.transactions = new Subject()
     this.signatures = new Subject()
@@ -267,7 +267,7 @@ export default class Aragon {
    *
    * @return {Promise<void>}
    */
-  async initAcl ({ aclAddress } = {}) {
+  async initAcl ({ aclAddress, cacheBlockHeight } = {}) {
     if (!aclAddress) {
       aclAddress = await this.kernelProxy.call('acl')
     }
@@ -279,11 +279,6 @@ export default class Aragon {
     const CHANGE_PERMISSION_MANAGER_EVENT = 'ChangePermissionManager'
 
     const ACL_CACHE_KEY = getCacheKey(aclAddress, 'acl')
-
-    const REORG_SAFETY_BLOCK_AGE = 100
-
-    const currentBlock = await this.web3.eth.getBlockNumber()
-    const cacheBlockHeight = Math.max(currentBlock - REORG_SAFETY_BLOCK_AGE, 0) // clamp to 0 for safety
 
     // Check if we have cached ACL for this address
     // Cache object for an ACL: { permissions, blockNumber }
@@ -934,30 +929,75 @@ export default class Aragon {
    *
    * @return {void}
    */
-  initForwardedActions () {
-    this.forwardedActions = new BehaviorSubject({}).pipe(
-      scan(
-        (actions, { currentApp, actionId, evmScript = '', state = 0 }) => {
-          const updateIndex = actions.findIndex(
-            action => action.currentApp === currentApp && action.actionId === actionId
-          )
-          if (updateIndex === -1) {
-            // set the last address as the target of the forwarded action
-            const target = evmScript ? this.decodeTransactionPath(evmScript).pop().to : ''
-            currentApp && actions.push({ currentApp, actionId, target, evmScript, state })
-            return actions
-          } else {
-            // only update any state if the state update is the latest
-            if (actions[updateIndex].state < state) {
-              actions[updateIndex].state = state
-              // only update the evmScript if it's included
-              if (evmScript !== '') actions[updateIndex].evmScript = evmScript
-            }
-            return actions
+  async initForwardedActions ({ cacheBlockHeight = 0 } = {}) {
+    const cachedActions = (await this.cache.get('forwardedActions')) || {}
+
+    this.forwardedActions = new BehaviorSubject({ ...cachedActions }).pipe(
+      scan((
+        inMemoryActions,
+        {
+          actionId,
+          blockNumber,
+          currentApp,
+          evmScript,
+          status = 'pending',
+          target
+        }
+      ) => {
+        if (
+          (!currentApp && !actionId && !evmScript && !target) ||
+          !['pending', 'failed', 'completed'].includes(status) ||
+          !blockNumber ||
+          !target
+        ) return inMemoryActions
+
+        function mutate (actions) {
+          const targetActions = actions[target] || {
+            completedActionKeys: [],
+            failedActionKeys: [],
+            pendingActionKeys: [],
+            actions: {}
           }
-        },
-        [] // actions seed
-      ),
+
+          const actionKey = `${currentApp},${actionId}`
+          const existingAction = targetActions.actions[actionKey]
+
+          // dealing with async:
+          // return early if existing action is already marked as completed or failed
+          // (if we already discovered that this action has completed or failed,
+          // we don't want to go back to pending, and there's nothing else to update)
+          if (existingAction && ['failed', 'completed'].includes(existingAction.status)) return
+
+          actions[target] = actions[target] || targetActions
+
+          actions[target].actions[actionKey] = { actionId, currentApp, evmScript, status, target }
+
+          if (!existingAction) {
+            const statusKey = `${status}ActionKeys`
+            actions[target][statusKey] = [ ...targetActions[statusKey], actionKey ]
+          } else {
+            if (status !== 'pending') {
+              actions[target].pendingActionKeys = targetActions.pendingActionKeys.filter(k => k !== actionKey)
+            }
+
+            if (status === 'failed') {
+              actions[target].failedActionKeys = [ ...targetActions.failedActionKeys, actionKey ]
+            }
+
+            if (status === 'completed') {
+              actions[target].completedActionKeys = [ ...targetActions.completedActionKeys, actionKey ]
+            }
+          }
+        }
+
+        if (blockNumber < cacheBlockHeight) {
+          mutate(cachedActions)
+          this.cache.set('forwardedActions', cachedActions)
+        }
+
+        mutate(inMemoryActions)
+        return inMemoryActions
+      }),
       publishReplay(1)
     )
     this.forwardedActions.connect()
@@ -969,14 +1009,42 @@ export default class Aragon {
    * @param {string} currentApp
    * @param {string} actionId
    * @param {string} evmScript
-   * @param {integer} state
+   * @param {integer} status
    */
-  setForwardedAction (currentApp, actionId, evmScript, state) {
+  setForwardedAction ({
+    actionId,
+    blockNumber,
+    currentApp,
+    evmScript,
+    status = 'pending'
+  }) {
+    if (!blockNumber) throw new Error('must provide blockNumber')
+
+    if (!(['pending', 'failed', 'completed'].includes(status))) {
+      throw new Error(
+        `unexpected status for forwardedAction
+         expected one of 'pending', 'failed', 'completed'
+         got: '${status}'`
+      )
+    }
+
+    if (!evmScript) {
+      throw new Error(
+        `must provide a valid evmScript when forwarding an action;
+         got: '${evmScript}'`
+      )
+    }
+
+    // set the last address as the target of the forwarded action
+    const target = this.decodeTransactionPath(evmScript).pop().to
+
     this.forwardedActions.next({
-      currentApp,
       actionId,
+      blockNumber,
+      currentApp,
       evmScript,
-      state
+      status,
+      target
     })
   }
 
