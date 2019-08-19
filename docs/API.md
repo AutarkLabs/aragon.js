@@ -174,13 +174,10 @@ Returns **[Observable](https://rxjs-dev.firebaseapp.com/api/index/class/Observab
 
 Creates a handle to interact with an external contract (i.e. a contract that is **not** your app's smart contract, such as a token).
 
-> **Note**<br>
-> Sending transactions to these external contracts is not yet supported as additional security and disclosure enhancements are required in frontend clients (this is a large attack vector for malicious applications to invoke dangerous functionality).
-
 #### Parameters
 
 - `address` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**: The address of the external contract
-- `jsonInterface` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)&lt;[Object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)>**: The [JSON interface](https://web3js.readthedocs.io/en/1.0/glossary.html#glossary-json-interface) of the external contract
+- `jsonInterface` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)&lt;[Object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)>**: The [JSON interface](https://solidity.readthedocs.io/en/latest/abi-spec.html#abi-json) of the external contract
 
 #### Examples
 
@@ -471,3 +468,13 @@ Returns **void**
 Receives data produced by an external app.
 
 Returns **Observable** An [RxJS observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html) that emits the current information relevant to the calling app. The emitted contents are an array of objects, each containing `dataId`, `currentApp`, `to`, and `cid` keys. The `currentApp` address key is the App . The remaining parameters are described above.
+### trigger
+
+Trigger an event handler in the application's store. This can be used to periodically update the frontend with current contract information.
+
+#### Parameters
+
+- `eventName` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**: The name of the event to be handled within the reducer.
+- `Object` **[Object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** (optional, default `{}`): event data
+
+Returns **void**.

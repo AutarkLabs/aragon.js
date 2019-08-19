@@ -60,7 +60,7 @@ Initialise the wrapper.
 
 Returns **[Promise](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)&lt;void>**
 
-Throws **[Error](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error)** if the `daoAddress` provided during constructor is detected to not be a [`Kernel`](https://github.com/aragon/aragonOS/blob/dev/contracts/kernel/Kernel.sol) instance
+Throws **[Error](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error)** if the `daoAddress` provided during constructor is detected to not be a [`Kernel`](https://github.com/aragon/aragonOS/blob/next/contracts/kernel/Kernel.sol) instance
 
 ### initAccounts
 
@@ -81,7 +81,7 @@ Initialise the ACL.
 #### **Parameters**
 
 - `options` **[Object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)**
-  - `aclAddress` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Address of the [`ACL`](https://github.com/aragon/aragonOS/blob/dev/contracts/acl/ACL.sol) instance to use, defaults to the `daoAddress`'s default `ACL`
+  - `aclAddress` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Address of the [`ACL`](https://github.com/aragon/aragonOS/blob/next/contracts/acl/ACL.sol) instance to use, defaults to the `daoAddress`'s default `ACL`
 
 Returns **[Promise](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)&lt;void>**
 
@@ -225,3 +225,14 @@ Returns **void**
 Either create a new entry or update an existing entry in the actions array emitted by the forwardedActions Observable. If an array with keys matching `currentApp` and `actionId` exists, it is updated with the values that are passed. Otherwise, a new entry is created.
 
 Returns **void**
+### triggerAppStore
+
+Emit an event in the designated AppProxy `store` from the frontend
+
+### ***Parameters***
+
+- `appProxy` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Address of the app receiving the event
+- `eventName` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)** Name of the event to be handled by the app
+- `returnValues` **[Object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)** Values passed into the handler
+
+Returns an `Observable` to the Apps subscribed to the `triggers` `Subject`

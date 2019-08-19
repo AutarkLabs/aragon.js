@@ -61,6 +61,7 @@ import { doIntentPathsMatch } from './utils/intents'
 import {
   applyForwardingPretransaction,
   createDirectTransaction,
+  createDirectTransactionForApp,
   createForwarderTransactionBuilder,
   getRecommendedGasLimit
 } from './utils/transactions'
@@ -238,6 +239,7 @@ export default class Aragon {
     this.initNotifications()
     this.initAppMetadata({ cacheBlockHeight })
     this.initForwardedActions()
+    this.trigger = new Subject()
     this.transactions = new Subject()
     this.signatures = new Subject()
   }
@@ -576,8 +578,8 @@ export default class Aragon {
       //   - No apps are lying about their appId (malicious apps _could_ masquerade as other
       //     apps by setting this value themselves)
       //   - `contractAddress`s will stay the same across all installed apps.
-      //      This is technically not true as apps could set this value themselves
-      //      (e.g. as pinned apps do), but these apps wouldn't be able to upgrade anyway
+      //     This is technically not true as apps could set this value themselves
+      //     (e.g. as pinned apps do), but these apps wouldn't be able to upgrade anyway
       //
       //  Ultimately returns an array of objects, holding the repo's:
       //    - appId
@@ -596,8 +598,8 @@ export default class Aragon {
       )),
 
       // Filter list of installed repos into:
-      //   - New repos we haven't seen before (so we only subscribe once to their events)
-      //   - Repos with apps that were updated in the kernel, to recalculate their current version
+      //   - New repos we haven't seen before (to begin subscribing to their version events)
+      //   - Repos we've seen before, to trigger a recalculation of the currently installed version
       map((repos) => {
         const newRepoAppIds = []
         const updatedRepoAppIds = []
@@ -624,17 +626,29 @@ export default class Aragon {
 
       // Project new repos into their ids and web3 proxy objects
       concatMap(async ([newRepoAppIds, updatedRepoAppIds]) => {
-        const newRepos = await Promise.all(
+        const newRepos = (await Promise.all(
           newRepoAppIds.map(async (appId) => {
-            const repoProxy = await makeRepoProxy(appId, this.apm, this.web3)
-            await repoProxy.updateInitializationBlock()
+            let repoProxy
+
+            try {
+              repoProxy = await makeRepoProxy(appId, this.apm, this.web3)
+              await repoProxy.updateInitializationBlock()
+            } catch (err) {
+              console.error(`Could not find repo for ${appId}`, err)
+            }
 
             return {
               appId,
               repoProxy
             }
           })
-        )
+        ))
+          // Filter out repos we couldn't create proxies for (they were likely due to publishing
+          // invalid aragonPM repos)
+          // Note that we don't need to worry about doing this for the updated repos list; if
+          // we could not create the original repo proxy when we first saw the repo, the updates
+          // won't do anything because we weren't able to fetch enough information (versions list)
+          .filter((newRepos) => newRepos.repoProxy)
         return [newRepos, updatedRepoAppIds]
       }),
 
@@ -1240,6 +1254,25 @@ export default class Aragon {
   }
 
   /**
+   *
+   * Emit an event with returnValues in the appProxy's store
+   *
+   * @param {string} appProxy the app context where the event will be emitted
+   * @param {string} eventName The name of the event to be handled within the `store`
+   * @param {Object} returnValues Optional returnValues passed within the event
+   * @return {void}
+   */
+  triggerAppStore (appProxy, eventName, returnValues) {
+    this.trigger.next({
+      origin: appProxy,
+      frontendEvent: {
+        event: eventName,
+        returnValues
+      }
+    })
+  }
+
+  /**
    * Run an app.
    *
    * As there may be race conditions with losing messages from cross-context environments,
@@ -1305,6 +1338,7 @@ export default class Aragon {
         // External contract handlers
         handlers.createRequestHandler(request$, 'external_call', handlers.externalCall),
         handlers.createRequestHandler(request$, 'external_events', handlers.externalEvents),
+        handlers.createRequestHandler(request$, 'external_intent', handlers.externalIntent),
         handlers.createRequestHandler(request$, 'external_past_events', handlers.externalPastEvents),
 
         // Identity handlers
@@ -1320,7 +1354,9 @@ export default class Aragon {
         handlers.createRequestHandler(request$, 'get_forwarded_actions', handlers.getForwardedActions),
 
         // Etc.
-        handlers.createRequestHandler(request$, 'notification', handlers.notifications)
+        handlers.createRequestHandler(request$, 'notification', handlers.notifications),
+        handlers.createRequestHandler(request$, 'trigger', handlers.triggerAppStore),
+        handlers.createRequestHandler(request$, 'getTriggers', handlers.getTriggers)
       ).subscribe(
         (response) => messenger.sendResponse(response.id, response.payload)
       )
@@ -1399,15 +1435,20 @@ export default class Aragon {
   }
 
   /**
-   * @param {Array<Object>} transactionPath An array of Ethereum transactions that describe each step in the path
-   * @return {Promise<string>} transaction hash
+   * @param {Array<Object>} transactionPath An array of Ethereum transactions that describe each
+   *   step in the path
+   * @param {Object} [options]
+   * @param {boolean} [options.external] Whether the transaction path is initiating an action on
+   *   an external destination (not the currently running app)
+   * @return {Promise<string>} Promise that should be resolved with the sent transaction hash
    */
-  performTransactionPath (transactionPath) {
+  performTransactionPath (transactionPath, { external } = {}) {
     return new Promise((resolve, reject) => {
       this.transactions.next({
+        resolve,
+        external: !!external,
         transaction: transactionPath[0],
         path: transactionPath,
-        resolve,
         reject (err) {
           reject(err || new Error('The transaction was not signed'))
         }
@@ -1465,11 +1506,46 @@ export default class Aragon {
       if (path.length > 0) {
         try {
           return this.describeTransactionPath(path)
-        } catch (_) { }
+        } catch (_) {
+          return path
+        }
       }
     }
 
     return []
+  }
+
+  /**
+   * Calculate the transaction path for a transaction to an external `destination`
+   * (not the currently running app) that invokes a method matching the
+   * `methodJsonDescription` with `params`.
+   *
+   * @param  {string} destination Address of the external contract
+   * @param  {object} methodJsonDescription ABI description of method to invoke
+   * @param  {Array<*>} params
+   * @return {Promise<Array<Object>>} An array of Ethereum transactions that describe each step in the path.
+   *   If the destination is a non-installed contract, always results in an array containing a
+   *   single transaction.
+   */
+  async getExternalTransactionPath (destination, methodJsonDescription, params) {
+    let path
+
+    const installedApp = await this.getApp(destination)
+    if (installedApp) {
+      // Destination is an installed app; need to go through normal transaction pathing
+      path = this.getTransactionPath(destination, methodJsonDescription.name, params)
+    } else {
+      // Destination is not an installed app on this org, just create a direct transaction
+      // with the first account
+      const account = (await this.getAccounts())[0]
+
+      try {
+        const tx = await createDirectTransaction(account, destination, methodJsonDescription, params, this.web3)
+        path = this.describeTransactionPath([tx])
+      } catch (_) {}
+    }
+
+    return path || []
   }
 
   /**
@@ -1517,7 +1593,7 @@ export default class Aragon {
       const directTransactions = await Promise.all(
         intentBasket.map(
           async ([destination, methodName, params]) =>
-            createDirectTransaction(sender, await this.getApp(destination), methodName, params, this.web3)
+            createDirectTransactionForApp(sender, await this.getApp(destination), methodName, params, this.web3)
         )
       )
 
@@ -1894,7 +1970,7 @@ export default class Aragon {
 
     const permissions = await this.permissions.pipe(first()).toPromise()
     const app = await this.getApp(destination)
-    const directTransaction = await createDirectTransaction(sender, app, methodName, params, this.web3)
+    const directTransaction = await createDirectTransactionForApp(sender, app, methodName, params, this.web3)
 
     let appsWithPermissionForMethod = []
 
