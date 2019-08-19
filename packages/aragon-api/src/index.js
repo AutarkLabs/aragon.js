@@ -590,6 +590,49 @@ export class AppProxy {
       [from, dataId]
     ).pipe(pluck('result'))
   }
+  /**
+   * send a forwarded action's information to the wrapper
+   *
+   * @param {string} actionId ID assigned to forwarded action in Forwarder
+   * @param {string} evmScript The execution script caught by the Forwarder
+   * @return {void}
+   */
+  newForwardedAction (actionId, evmScript) {
+    return this.rpc.send(
+      'update_forwarded_action',
+      [actionId, evmScript]
+    )
+  }
+
+  /**
+   * update a forwarded action's state the wrapper
+   *
+   * If the execution is pending, state = 0
+   * If the execution completed, state = 1
+   * If the execution failed, state = 2
+   *
+   * @param {string} actionId ID assigned to forwarded action in Forwarder
+   * @param {integer} state The current state of the forwarded action within the forwarder
+   * @param {string} [evmScript=''] The optionally updated execution script
+   * @return {void}
+   */
+  updateForwardedAction (actionId, state, evmScript = '') {
+    return this.rpc.send(
+      'update_forwarded_action',
+      [actionId, evmScript, state]
+    )
+  }
+
+  /**
+   * Listens for forwarded actions that target your app and emits them like contract events
+   *
+   * @return {Observable} An [RxJS observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html) that emits an array of forwarded action objects
+   */
+  getForwardedActions () {
+    return this.rpc.sendAndObserveResponses(
+      'get_forwarded_actions'
+    ).pipe(pluck('result'))
+  }
 }
 
 /**

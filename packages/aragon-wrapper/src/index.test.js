@@ -1471,8 +1471,6 @@ test('should init the appMetadata correctly', async (t) => {
 
 test('should add metadata items', async (t) => {
   t.plan(2)
-
-  // arrange
   const { Aragon } = t.context
   const instance = new Aragon()
   instance.cache.get = sinon.stub().returns({})
@@ -1523,6 +1521,96 @@ test('should add metadata items', async (t) => {
         to: ['*']
       }
     })
+  })
+})
+
+test('should init the forwarded actions correctly', async (t) => {
+  t.plan(1)
+  // arrange
+  const { Aragon } = t.context
+  const instance = new Aragon()
+  // act
+  await instance.initForwardedActions()
+  // assert
+  instance.forwardedActions.subscribe(value => {
+    console.log('value: ', value)
+    t.deepEqual(value, [])
+  })
+})
+
+test('should set forwarded actions', async (t) => {
+  t.plan(3)
+
+  // arrange
+  const { Aragon } = t.context
+  const instance = new Aragon()
+  const script = encodeCallScript([{
+    to: '0xcafe1a77e84698c83ca8931f54a755176ef75f2c',
+    data: '0xcafe25'
+  }, {
+    to: '0xbeefbeef03c7e5a1c29e0aa675f8e16aee0a5fad',
+    data: '0xbeef'
+  }, {
+    to: '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad',
+    data: '0x'
+  }])
+
+  // act
+  await instance.initForwardedActions()
+  instance.setForwardedAction('0x0', '1', script)
+
+  // assert
+  instance.forwardedActions.pipe(first()).subscribe(value => {
+    t.deepEqual(value, [{
+      currentApp: '0x0',
+      actionId: '1',
+      evmScript: script,
+      target: '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad',
+      state: 0
+    }])
+  })
+
+  // update existing entry
+  // act
+  instance.setForwardedAction('0x0', '1', '', 1)
+  // assert
+  instance.forwardedActions.pipe(first()).subscribe(value => {
+    t.deepEqual(value, [{
+      currentApp: '0x0',
+      actionId: '1',
+      evmScript: script,
+      target: '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad',
+      state: 1
+    }])
+  })
+
+  // add multiple entries
+  // act
+  instance.setForwardedAction('0x0', '2', script)
+  instance.setForwardedAction('0x0', '3', script)
+  // assert
+  instance.forwardedActions.pipe(first()).subscribe(value => {
+    t.deepEqual(value, [{
+      currentApp: '0x0',
+      actionId: '1',
+      evmScript: script,
+      target: '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad',
+      state: 1
+    },
+    {
+      currentApp: '0x0',
+      actionId: '2',
+      evmScript: script,
+      target: '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad',
+      state: 0
+    },
+    {
+      currentApp: '0x0',
+      actionId: '3',
+      evmScript: script,
+      target: '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad',
+      state: 0
+    }])
   })
 })
 

@@ -71,3 +71,6 @@ export { default as getAppMetadata } from './get-app-metadata'
 export { default as queryAppMetadata } from './query-app-metadata'
 
 export { default as notifications } from './notifications'
+
+export { default as updateForwardedAction } from './update-forwarded-action'
+export { default as getForwardedActions } from './get-forwarded-actions'

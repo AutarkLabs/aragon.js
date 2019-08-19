@@ -237,6 +237,7 @@ export default class Aragon {
     this.initNetwork()
     this.initNotifications()
     this.initAppMetadata({ cacheBlockHeight })
+    this.initForwardedActions()
     this.transactions = new Subject()
     this.signatures = new Subject()
   }
@@ -914,6 +915,56 @@ export default class Aragon {
       to
     })
   }
+  /**
+   * Initialize the forwardedActions observable
+   *
+   * @return {void}
+   */
+  initForwardedActions () {
+    this.forwardedActions = new BehaviorSubject({}).pipe(
+      scan(
+        (actions, { currentApp, actionId, evmScript = '', state = 0 }) => {
+          const updateIndex = actions.findIndex(
+            action => action.currentApp === currentApp && action.actionId === actionId
+          )
+          if (updateIndex === -1) {
+            // set the last address as the target of the forwarded action
+            const target = evmScript ? this.decodeTransactionPath(evmScript).pop().to : ''
+            currentApp && actions.push({ currentApp, actionId, target, evmScript, state })
+            return actions
+          } else {
+            // only update any state if the state update is the latest
+            if (actions[updateIndex].state < state) {
+              actions[updateIndex].state = state
+              // only update the evmScript if it's included
+              if (evmScript !== '') actions[updateIndex].evmScript = evmScript
+            }
+            return actions
+          }
+        },
+        [] // actions seed
+      ),
+      publishReplay(1)
+    )
+    this.forwardedActions.connect()
+  }
+
+  /**
+   * set a forwarded action
+   *
+   * @param {string} currentApp
+   * @param {string} actionId
+   * @param {string} evmScript
+   * @param {integer} state
+   */
+  setForwardedAction (currentApp, actionId, evmScript, state) {
+    this.forwardedActions.next({
+      currentApp,
+      actionId,
+      evmScript,
+      state
+    })
+  }
 
   /**
    * Set the identifier of an app.
@@ -1265,6 +1316,8 @@ export default class Aragon {
         handlers.createRequestHandler(request$, 'register_app_metadata', handlers.registerAppMetadata),
         handlers.createRequestHandler(request$, 'get_app_metadata', handlers.getAppMetadata),
         handlers.createRequestHandler(request$, 'query_app_metadata', handlers.queryAppMetadata),
+        handlers.createRequestHandler(request$, 'update_forwarded_action', handlers.updateForwardedAction),
+        handlers.createRequestHandler(request$, 'get_forwarded_actions', handlers.getForwardedActions),
 
         // Etc.
         handlers.createRequestHandler(request$, 'notification', handlers.notifications)
