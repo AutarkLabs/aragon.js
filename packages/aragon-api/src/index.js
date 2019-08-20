@@ -569,6 +569,8 @@ export class AppProxy {
   frontendTriggers () {
     return this.rpc.sendAndObserveResponses(
       'getTriggers'
+    ).pipe(
+      pluck('result')
     )
   }
 
