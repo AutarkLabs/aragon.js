@@ -15,7 +15,10 @@ import {
   startWith,
   switchMap,
   throttleTime,
-  withLatestFrom
+  withLatestFrom,
+  flatMap,
+  skipWhile,
+  defaultIfEmpty
 } from 'rxjs/operators'
 import Web3 from 'web3'
 import { isAddress } from 'web3-utils'
@@ -37,7 +40,7 @@ import { isKernelAppCodeNamespace } from './core/aragonOS/kernel'
 import { setConfiguration } from './configuration'
 import * as configurationKeys from './configuration/keys'
 import ens from './ens'
-import { LocalIdentityProvider } from './identity'
+import { LocalIdentityProvider, AddressBookIdentityProvider } from './identity'
 import { getAbi } from './interfaces'
 import {
   postprocessRadspecDescription,
@@ -184,8 +187,8 @@ export default class Aragon {
     await this.kernelProxy.updateInitializationBlock()
     await this.initAccounts(options.accounts)
     await this.initAcl(Object.assign({ aclAddress }, options.acl))
-    await this.initIdentityProviders()
     this.initApps()
+    await this.initIdentityProviders()
     this.initForwarders()
     this.initAppIdentifiers()
     this.initNetwork()
@@ -879,6 +882,10 @@ export default class Aragon {
     const defaultIdentityProviders = [{
       name: 'local',
       provider: new LocalIdentityProvider()
+    },
+    {
+      name: 'addressBook',
+      provider: new AddressBookIdentityProvider(this.apps, this.cache)
     }]
     // TODO: detect other installed providers
     const detectedIdentityProviders = []
@@ -923,12 +930,20 @@ export default class Aragon {
    * @return {Promise} Resolves with the identity or null if not found
    */
   resolveAddressIdentity (address) {
-    const providerName = 'local' // TODO - get provider
-    const provider = this.identityProviderRegistrar.get(providerName)
-    if (provider && typeof provider.resolve === 'function') {
-      return provider.resolve(address)
-    }
-    return Promise.reject(new Error(`Provider (${providerName}) not installed`))
+    const providerNames = [ 'local', 'addressBook' ] // TODO - get provider
+    return from(providerNames).pipe(
+      map(providerName => {
+        const provider = this.identityProviderRegistrar.get(providerName)
+        if (provider && typeof provider.resolve === 'function') {
+          return provider.resolve(address)
+        }
+        return Promise.reject(new Error(`Provider (${providerName}) not installed`))
+      }),
+      flatMap(unresolvedAddress => from(unresolvedAddress)),
+      skipWhile(entryData => !entryData),
+      defaultIfEmpty(null),
+      first()
+    ).toPromise()
   }
 
   /**
@@ -937,13 +952,23 @@ export default class Aragon {
    * @param  {string} searchTerm
    * @return {Promise} Resolves with the identity or null if not found
    */
-  searchIdentities (searchTerm) {
-    const providerName = 'local' // TODO - get provider
-    const provider = this.identityProviderRegistrar.get(providerName)
-    if (provider && typeof provider.search === 'function') {
-      return provider.search(searchTerm)
-    }
-    return Promise.reject(new Error(`Provider (${providerName}) not installed`))
+  async searchIdentities (searchTerm) {
+    const providerNames = [ 'local', 'addressBook' ] // TODO - get provider
+    const resolvedResults = await Promise.all(
+      providerNames.map(providerName => {
+        const provider = this.identityProviderRegistrar.get(providerName)
+        if (provider && typeof provider.search === 'function') {
+          return provider.search(searchTerm)
+        }
+        return Promise.reject(new Error(`Provider (${providerName}) not installed`))
+      })
+    )
+    return resolvedResults.reduce(
+      (combinedResults, providerResult) => {
+        return [ ...combinedResults, ...providerResult ]
+      },
+      []
+    )
   }
 
   /**
