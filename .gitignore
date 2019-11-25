@@ -20,3 +20,6 @@ lerna-debug.log
 wallaby.js
 
 .localstorage
+
+orbitdb
+ipfs
