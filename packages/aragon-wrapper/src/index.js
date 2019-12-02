@@ -37,7 +37,7 @@ import { isKernelAppCodeNamespace } from './core/aragonOS/kernel'
 import { setConfiguration } from './configuration'
 import * as configurationKeys from './configuration/keys'
 import ens from './ens'
-import { LocalIdentityProvider } from './identity'
+import { LocalIdentityProvider, ThreeBoxIdentityProvider } from './identity'
 import { getAbi } from './interfaces'
 import {
   postprocessRadspecDescription,
@@ -884,6 +884,9 @@ export default class Aragon {
     const defaultIdentityProviders = [{
       name: 'local',
       provider: new LocalIdentityProvider()
+    }, {
+      name: '3box',
+      provider: new ThreeBoxIdentityProvider()
     }]
     // TODO: detect other installed providers
     const detectedIdentityProviders = []
@@ -928,7 +931,7 @@ export default class Aragon {
    * @return {Promise} Resolves with the identity or null if not found
    */
   resolveAddressIdentity (address) {
-    const providerName = 'local' // TODO - get provider
+    const providerName = '3box' // TODO - get provider
     const provider = this.identityProviderRegistrar.get(providerName)
     if (provider && typeof provider.resolve === 'function') {
       return provider.resolve(address)

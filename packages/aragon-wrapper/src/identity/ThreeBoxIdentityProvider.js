@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { isAddress } from 'web3-utils';
+
 import AddressIdentityProvider from './AddressIdentityProvider';
 
 const BOX_SERVER_URL = 'https://ipfs.3box.io';
@@ -9,7 +11,10 @@ const extractImgHash = image => {
   return hash || null;
 };
 
+const noop = () => {}
+
 export default class ThreeBoxIdentityProvider extends AddressIdentityProvider {
+  init = noop
   /**
    * Resolve the identity metadata for an address
    * Should resolve to null if an identity could not be found
@@ -22,10 +27,13 @@ export default class ThreeBoxIdentityProvider extends AddressIdentityProvider {
       throw new Error('address is required when resolving a 3box identity');
     }
 
+    if (!isAddress(address)) {
+      throw new Error('invalid address passed to 3box identity resolver')
+    }
+
     try {
       const { data } = await axios.get(
-        `${BOX_SERVER_URL}/profile?address=${address.toLowerCase()}`,
-        { withCredentials: true }
+        `${BOX_SERVER_URL}/profile?address=${address.toLowerCase()}`
       );
 
       return {
