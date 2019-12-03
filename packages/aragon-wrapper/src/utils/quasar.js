@@ -1,14 +1,15 @@
 import axios from 'axios'
 
-export const listenForPinHashEvents = async (proxyAddress) => {
+export const listenForPinHashEvents = async (proxyAddress, datastoreEndpoint = 'http://localhost:3003/api/v0') => {
   try {
-    const response = await fetch(`http://localhost:3003/api/v0/storageContracts`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ contractAddress: proxyAddress }),
-    })
+    const response = await axios.post(
+      `${datastoreEndpoint}/storageContracts`,
+      JSON.stringify({ contractAddress: proxyAddress }),
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
     if (!(response.status === 201 || response.status === 204)) {
       console.error(`Error registering contract with proxyAddress: ${proxyAddress} with Quasar`)
     }

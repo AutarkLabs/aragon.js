@@ -169,6 +169,7 @@ export default class Aragon {
    * @param {Object} [options.accounts] `initAccount()` options (see below)
    * @param {Object} [options.acl] `initACL()` options (see below)
    * @param {Object} [options.guiStyle] `initGuiStyle()` options (see below)
+   * @param {Object} [options.datastore] `initApps()` options (see below)
    * @return {Promise<void>}
    * @throws {Error} Will throw an error if the `daoAddress` is detected to not be a Kernel instance
    */
@@ -188,7 +189,7 @@ export default class Aragon {
     await this.initAccounts(options.accounts)
     await this.initAcl(Object.assign({ aclAddress }, options.acl))
     await this.initIdentityProviders()
-    this.initApps()
+    this.initApps(options.datastore)
     this.initForwarders()
     this.initAppIdentifiers()
     this.initNetwork()
@@ -350,7 +351,7 @@ export default class Aragon {
    *
    * @return {void}
    */
-  initApps () {
+  initApps (datastore) {
     /******************************
      *                            *
      *          CACHING           *
@@ -529,7 +530,7 @@ export default class Aragon {
 
             // ensure organization datastore is listening if app is a storage app
             if (isStorageApp(appInfo)) {
-              await listenForPinHashEvents(app.proxyAddress);
+              await listenForPinHashEvents(app.proxyAddress, datastore)
             }
 
             return {
