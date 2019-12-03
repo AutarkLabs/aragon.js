@@ -10,7 +10,10 @@ export const listenForPinHashEvents = async (proxyAddress, datastoreEndpoint = '
           'Content-Type': 'application/json'
         }
       })
-    if (!(response.status === 201 || response.status === 204)) {
+    if (!(response.status === 200
+      || response.status === 201
+      || response.status === 204)
+      ) {
       console.error(`Error registering contract with proxyAddress: ${proxyAddress} with Quasar`)
     }
   } catch (err) {
