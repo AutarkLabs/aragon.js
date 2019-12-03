@@ -65,6 +65,7 @@ import {
   createForwarderTransactionBuilder,
   getRecommendedGasLimit
 } from './utils/transactions'
+import { listenForPinHashEvents, isStorageApp } from './utils/quasar'
 
 // Try to get an injected web3 provider, return a public one otherwise.
 export const detectProvider = () =>
@@ -524,6 +525,11 @@ export default class Aragon {
               isForwarderOverride = {
                 isForwarder: false
               }
+            }
+
+            // ensure organization datastore is listening if app is a storage app
+            if (isStorageApp(appInfo)) {
+              await listenForPinHashEvents(app.proxyAddress);
             }
 
             return {
