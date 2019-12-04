@@ -1,21 +1,31 @@
-import { map, filter } from 'rxjs/operators'
-export function trigger (request, proxy, wrapper) {
-  const [
-    eventName,
-    returnValues
-  ] = request.params
+import { APP_CONTEXTS } from '../../apps'
 
-  wrapper.triggerAppStore(
-    proxy.address,
-    eventName,
-    returnValues
-  )
-  return Promise.resolve()
-}
+export default function trigger (request, proxy, wrapper) {
+  const [operation] = request.params
 
-export function triggerSubscribe (request, proxy, wrapper) {
-  return wrapper.trigger.pipe(
-    filter(appEvent => appEvent.origin === proxy.address),
-    map(appEvent => appEvent.frontendEvent)
+  if (operation === 'observe') {
+    return wrapper.appContextPool.get(proxy.address, APP_CONTEXTS.TRIGGER)
+  }
+  if (operation === 'emit') {
+    const [
+      eventName,
+      data
+    ] = request.params.slice(1)
+
+    wrapper.appContextPool.emit(
+      proxy.address,
+      APP_CONTEXTS.TRIGGER,
+      // Mimic web3.js@1's event schema
+      {
+        event: eventName,
+        // `returnValues` is always a object for real Ethereum events
+        returnValues: data || {}
+      }
+    )
+    return Promise.resolve()
+  }
+
+  return Promise.reject(
+    new Error('Invalid trigger operation')
   )
 }

@@ -51,8 +51,8 @@ export async function applyPretransaction (directTransaction, web3) {
   return directTransaction
 }
 
-export async function applyForwardingPretransaction (forwardingTransaction, web3) {
-  const { to: forwarder } = forwardingTransaction
+export async function applyForwardingFeePretransaction (forwardingTransaction, web3) {
+  const { to: forwarder, from } = forwardingTransaction
 
   // Check if a token approval pretransaction is needed due to the forwarder requiring a fee
   const forwardFee = new web3.eth.Contract(
@@ -62,7 +62,8 @@ export async function applyForwardingPretransaction (forwardingTransaction, web3
 
   const feeDetails = { amount: toBN(0) }
   try {
-    const feeResult = await forwardFee().call() // forwardFee() returns (address, uint256)
+    // Passing the EOA as `msg.sender` to the forwardFee call is useful for use cases where the fee differs relative to the account
+    const feeResult = await forwardFee().call({ from }) // forwardFee() returns (address, uint256)
     feeDetails.tokenAddress = feeResult[0]
     feeDetails.amount = toBN(feeResult[1])
   } catch (err) {
@@ -102,7 +103,7 @@ export async function createDirectTransaction (sender, destination, methodJsonDe
   return applyPretransaction(directTransaction, web3)
 }
 
-export async function createDirectTransactionForApp (sender, app, methodName, params, web3) {
+export async function createDirectTransactionForApp (sender, app, methodSignature, params, web3) {
   if (!app) {
     throw new Error(`Could not create transaction due to missing app artifact`)
   }
@@ -113,11 +114,26 @@ export async function createDirectTransactionForApp (sender, app, methodName, pa
     throw new Error(`No ABI specified in artifact for ${destination}`)
   }
 
+  // Is the given method a full signature, e.g. 'foo(arg1,arg2,...)'
+  const fullMethodSignature =
+    Boolean(methodSignature) && methodSignature.includes('(') && methodSignature.includes(')')
+
   const methodJsonDescription = app.abi.find(
-    (method) => method.name === methodName
+    (method) => {
+      // If the full signature isn't given, just find the first overload declared
+      if (!fullMethodSignature) {
+        return method.name === methodSignature
+      }
+
+      // Fallback functions don't have inputs in the ABI
+      const currentParameterTypes = Array.isArray(method.inputs) ? method.inputs.map(({ type }) => type) : []
+      const currentMethodSignature = `${method.name}(${currentParameterTypes.join(',')})`
+      return currentMethodSignature === methodSignature
+    }
   )
+
   if (!methodJsonDescription) {
-    throw new Error(`${methodName} not found on ABI for ${destination}`)
+    throw new Error(`${methodSignature} not found on ABI for ${destination}`)
   }
 
   return createDirectTransaction(sender, destination, methodJsonDescription, params, web3)
