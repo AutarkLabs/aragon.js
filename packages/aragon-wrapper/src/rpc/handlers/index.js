@@ -77,6 +77,3 @@ export { default as queryAppMetadata } from './query-app-metadata'
 
 export { default as updateForwardedAction } from './update-forwarded-action'
 export { default as getForwardedActions } from './get-forwarded-actions'
-
-export { trigger as newTrigger } from './trigger'
-export { triggerSubscribe as getTriggers } from './trigger'

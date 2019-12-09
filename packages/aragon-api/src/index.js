@@ -533,8 +533,7 @@ export class AppProxy {
     const getCurrentEvents = (fromBlock) => merge(
       this.events({ fromBlock }),
       ...externals.map(({ contract }) => contract.events({ fromBlock })),
-      this.getForwardedActions(),
-      this.frontendTriggers()
+      this.getForwardedActions()
     )
 
     // If `cachedFromBlock` is null there's no cache, `pastEvents` will use the initializationBlock
@@ -659,31 +658,6 @@ export class AppProxy {
     store$.connect()
 
     return store$
-  }
-
-  /**
-   *
-   * Trigger an event handler in the application's store
-   *
-   * @param {string} eventName The name of the event to be handled in the reducer
-   * @param {Object} [returnValues={}] Optional event data
-   */
-  trigger (eventName, returnValues = {}) {
-    return this.rpc.send(
-      'trigger',
-      [eventName, returnValues]
-    )
-  }
-
-  /**
-   * subscribe to an observable that emits events created by the frontend event triggers
-   */
-  frontendTriggers () {
-    return this.rpc.sendAndObserveResponses(
-      'getTriggers'
-    ).pipe(
-      pluck('result')
-    )
   }
 
   /**

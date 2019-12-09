@@ -501,6 +501,7 @@ test('should create a store and reduce correctly without previously cached state
     getCache: () => from([null]),
     pastEvents: () => of([]),
     triggers: () => of(),
+    getForwardedActions: () => of(),
     web3Eth: sinon.stub().withArgs('getBlockNumber').returns(from(['4385398']))
   }
   const reducer = (state, action) => {
@@ -565,6 +566,7 @@ test('should create a store and reduce correctly with previously cached state', 
     }),
     pastEvents: () => of([]),
     triggers: () => of(),
+    getForwardedActions: () => of(),
     web3Eth: sinon.stub().withArgs('getBlockNumber').returns(from(['4385398']))
   }
   const reducer = (state, action) => {
@@ -848,20 +850,4 @@ test('should return the forwardedActions observable', t => {
     })
   })
   t.is(instanceStub.rpc.sendAndObserveResponses.getCall(0).args[0], 'get_forwarded_actions')
-})
-
-test('should send a trigger request to the wrapper', t => {
-  t.plan(2)
-  // arrange
-  const triggerFn = Index.AppProxy.prototype.trigger
-  const instanceStub = {
-    rpc: {
-      send: sinon.stub()
-    }
-  }
-  // act
-  triggerFn.call(instanceStub, 'TriggerTest', { testprop: '123abc' })
-  // assert
-  t.is(instanceStub.rpc.send.getCall(0).args[0], 'trigger')
-  t.deepEqual(instanceStub.rpc.send.getCall(0).args[1], ['TriggerTest', { testprop: '123abc' }])
 })

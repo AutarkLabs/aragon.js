@@ -1487,24 +1487,23 @@ test('should be able to decode an evm call script with multiple transactions', a
 })
 
 test('should init the appMetadata correctly', async (t) => {
+  const { createAragon } = t.context
   t.plan(1)
   // arrange
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   // act
   await instance.initAppMetadata()
   // assert
   instance.appMetadata.subscribe(value => {
-    console.log('value: ', value)
     t.deepEqual(value, {})
   })
 })
 
 test('should add metadata items', async (t) => {
+  const { createAragon } = t.context
   t.plan(2)
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   // act
   await instance.initAppMetadata()
@@ -1557,10 +1556,10 @@ test('should add metadata items', async (t) => {
 })
 
 test('should init the forwarded actions correctly', async (t) => {
+  const { createAragon } = t.context
   t.plan(1)
   // arrange
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   // act
   await instance.initForwardedActions()
@@ -1572,9 +1571,9 @@ test('should init the forwarded actions correctly', async (t) => {
 })
 
 test('should forbid forwarding action with invalid status', async (t) => {
+  const { createAragon } = t.context
   // arrange
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   instance.cache.set = sinon.stub().resolves()
   const target = '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad'
@@ -1611,8 +1610,8 @@ test('should forbid forwarding action with invalid status', async (t) => {
 
 test('should forbid forwarding action without blockNumber', async (t) => {
   // arrange
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const { createAragon } = t.context
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   await instance.initForwardedActions()
   const target = '0xbaaabaaa03c7e5a1c29e0aa675f8e16aee0a5fad'
@@ -1645,8 +1644,8 @@ test('should forbid forwarding action without blockNumber', async (t) => {
 
 test('should forbid forwarding action with invalid evmScript', async (t) => {
   // arrange
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const { createAragon } = t.context
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   instance.cache.set = sinon.stub().resolves()
   await instance.initForwardedActions()
@@ -1687,8 +1686,8 @@ test('should forbid forwarding action with invalid evmScript', async (t) => {
 
 test('should set forwarded actions', async (t) => {
   // arrange
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const { createAragon } = t.context
+  const instance = createAragon()
   instance.cache.get = sinon.stub().returns({})
   instance.cache.set = sinon.stub().resolves()
   const script = encodeCallScript([{
@@ -1915,8 +1914,8 @@ test('should cache forwarded actions', async (t) => {
       }
     }
   }
-  const { Aragon } = t.context
-  const instance = new Aragon()
+  const { createAragon } = t.context
+  const instance = createAragon()
   instance.cache.get = sinon.stub().withArgs('forwardedActions').returns({ ...babaStored })
   instance.cache.set = sinon.stub().resolves()
   await instance.initForwardedActions({ cacheBlockHeight: 10 })
@@ -2306,26 +2305,4 @@ test('should be only able to decode call scripts when there are multiple nested 
       // ignores the second target's children because it's not a call script forward
     }
   ])
-})
-
-test('should create trigger events', async (t) => {
-  const { Aragon } = t.context
-
-  t.plan(1)
-  // arrange
-  const instance = new Aragon()
-  instance.trigger = new Subject()
-  instance.trigger.subscribe(value => {
-    t.deepEqual(value, {
-      origin: '0x0',
-      frontendEvent: {
-        event: 'TriggerTest',
-        returnValues: {
-          testval: 1
-        }
-      }
-    })
-  })
-  // act and assert
-  instance.triggerAppStore('0x0', 'TriggerTest', { testval: 1 })
 })

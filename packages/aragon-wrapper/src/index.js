@@ -198,7 +198,6 @@ export default class Aragon {
     this.initNetwork()
     this.initForwardedActions({ cacheBlockHeight })
     this.initAppMetadata({ cacheBlockHeight })
-    this.trigger = new Subject()
     this.transactions = new Subject()
     this.signatures = new Subject()
   }
@@ -1229,25 +1228,6 @@ export default class Aragon {
   }
 
   /**
-   *
-   * Emit an event with returnValues in the appProxy's store
-   *
-   * @param {string} appProxy the app context where the event will be emitted
-   * @param {string} eventName The name of the event to be handled within the `store`
-   * @param {Object} returnValues Optional returnValues passed within the event
-   * @return {void}
-   */
-  triggerAppStore (appProxy, eventName, returnValues) {
-    this.trigger.next({
-      origin: appProxy,
-      frontendEvent: {
-        event: eventName,
-        returnValues
-      }
-    })
-  }
-
-  /**
    * Run an app.
    *
    * As there may be race conditions with losing messages from cross-context environments,
@@ -1329,11 +1309,7 @@ export default class Aragon {
         handlers.createRequestHandler(request$, 'get_app_metadata', handlers.getAppMetadata),
         handlers.createRequestHandler(request$, 'query_app_metadata', handlers.queryAppMetadata),
         handlers.createRequestHandler(request$, 'update_forwarded_action', handlers.updateForwardedAction),
-        handlers.createRequestHandler(request$, 'get_forwarded_actions', handlers.getForwardedActions),
-
-        // Etc.
-        handlers.createRequestHandler(request$, 'trigger', handlers.newTrigger),
-        handlers.createRequestHandler(request$, 'getTriggers', handlers.getTriggers)
+        handlers.createRequestHandler(request$, 'get_forwarded_actions', handlers.getForwardedActions)
       ).subscribe(
         (response) => messenger.sendResponse(response.id, response.payload)
       )
