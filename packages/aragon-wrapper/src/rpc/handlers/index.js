@@ -71,3 +71,5 @@ export { pastEvents as externalPastEvents } from './external'
 export { default as addressIdentity } from './address-identity'
 export { default as appIdentifier } from './app-identifier'
 export { default as searchIdentities } from './search-identities'
+
+export { default as datastore } from './datastore'

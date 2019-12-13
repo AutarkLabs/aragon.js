@@ -448,6 +448,21 @@ export class AppProxy {
   }
 
   /**
+   * Interact with datastore
+   *
+   * @param  {method} key The method
+   * @return {string} Single-emission observable that emits the data as a result of interacting with the organization's data store. See the documentation in packages/aragon-wrapper/src/datastore/index.js for more details
+   */
+  datastore (method, ...params) {
+    return this.rpc.sendAndObserveResponse(
+      'datastore',
+      [method, ...params]
+    ).pipe(
+      pluck('result')
+    )
+  }
+
+  /**
    * Set a value in the application cache.
    *
    * @param  {string} key The cache key to set a value for

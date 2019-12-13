@@ -27,6 +27,7 @@ import * as handlers from './rpc/handlers'
 
 import AppContextPool, { APP_CONTEXTS } from './apps'
 import Cache from './cache'
+import Datastore from './datastore'
 import apm, { getApmInternalAppInfo } from './core/apm'
 import { makeRepoProxy, getAllRepoVersions, getRepoVersionById } from './core/apm/repo'
 import {
@@ -90,6 +91,8 @@ export const detectProvider = () =>
  *        IPFS gateway to fetch aragonPM artifacts from
  * @param {number} [options.apm.ipfs.fetchTimeout]
  *        Timeout for retrieving aragonPM artifacts from IPFS before failing
+ * @param {string} [options.datastore.host]
+ *        Quasar host endpoint (defaults to 'http://localhost:3003/api/v0')
  * @param {Object} [options.cache]
  *        Options for the internal cache
  * @param {boolean} [options.cache.forceLocalStorage=false]
@@ -160,6 +163,7 @@ export default class Aragon {
     this.appContextPool = new AppContextPool()
 
     this.defaultGasPriceFn = options.defaultGasPriceFn
+    this.datastore = new Datastore(options.datastore)
   }
 
   /**
@@ -1171,7 +1175,10 @@ export default class Aragon {
         // Identity handlers
         handlers.createRequestHandler(request$, 'identify', handlers.appIdentifier),
         handlers.createRequestHandler(request$, 'address_identity', handlers.addressIdentity),
-        handlers.createRequestHandler(request$, 'search_identities', handlers.searchIdentities)
+        handlers.createRequestHandler(request$, 'search_identities', handlers.searchIdentities),
+        
+        // Datastore handlers
+        handlers.createRequestHandler(request$, 'datastore', handlers.datastore)
       ).subscribe(
         (response) => messenger.sendResponse(response.id, response.payload)
       )
