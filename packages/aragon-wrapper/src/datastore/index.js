@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from 'axios';
 
 /**
  * The Datastore connects to Quasar to save and retreive data from IPFS.
@@ -9,14 +9,38 @@ import axios from 'axios'
  * @param {string} [options.host]
  *        Your Quasar endpoint.
  */
-export default class Datastore {
+ export default class Datastore {
   constructor(options) {
-    this.host = (options && options.host) || 'http://localhost:3003/api/v0'
+    this.host = (options && options.host) || 'http://localhost:3003/api/v0';
   }
 
-  setHost (host) {
-    this.host = host
+  setHost(host) {
+    this.host = host;
   }
+
+  // ensures that PinHash events fired at this contract address are picked up by Quasar
+  async listenToStorageApp(address) {
+    try {
+      const response = await axios.post(
+        `${this.host}/storageContracts`,
+        JSON.stringify({ contractAddress: address }),
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+      if (!(response.status === 200
+        || response.status === 201
+        || response.status === 204)
+      ) {
+        console.error(`Error registering contract with proxyAddress: ${address} with Quasar`)
+      }
+    } catch (err) {
+      console.error(`Error registering contract with proxyAddress: ${address} with Quasar: ${err}`)
+    }
+  }
+
+  isStorageApp = (appInfo) => appInfo.storage
 
   /*
     The `add` function accepts blobs or file objects. I.e.:
@@ -35,19 +59,16 @@ export default class Datastore {
       const hash = await add(file)
     }
   */
-  async add (val) {
-    const formData = new FormData()
-    formData.append('entry', val)
+  async add(val) {
+    const formData = new FormData();
+    formData.append('entry', val);
 
     try {
-      const result = await axios.post(
-        `${this.host}/add`,
-        formData
-      )
+      const result = await axios.post(`${this.host}/add`, formData);
 
-      return result.data
+      return result.data;
     } catch (err) {
-      console.error('Error pinning file to IPFS', err)
+      console.error('Error pinning file to IPFS', err);
     }
   }
 
@@ -57,32 +78,32 @@ export default class Datastore {
     Files objects are returned as a readable stream in the body field.
     You can find us using both of these in the open-enterprise repo.
   */
-  async cat (hash) {
+  async cat(hash) {
     try {
-      const result = await axios.get(`${this.host}/cat?arg=${hash}`)
-      return { data: result.data, body: result.body }
+      const result = await axios.get(`${this.host}/cat?arg=${hash}`);
+      return { data: result.data, body: result.body };
     } catch (err) {
-      console.error('Error catting file from IPFS', err)
+      console.error('Error catting file from IPFS', err);
     }
   }
 
   // a dag is any javascript object
-  async dagPut (dag) {
+  async dagPut(dag) {
     try {
-      const result = await axios.post(`${this.host}/dag/put`, dag)
-      return result.data
+      const result = await axios.post(`${this.host}/dag/put`, dag);
+      return result.data;
     } catch (err) {
-      console.error('Error putting dag to IPFS', err)
+      console.error('Error putting dag to IPFS', err);
     }
   }
 
   // returns the dag that was passed to dagPut
-  async dagGet (hash) {
+  async dagGet(hash) {
     try {
-      const result = await axios.get(`${this.host}/dag/get?arg=${hash}`)
-      return result.data
+      const result = await axios.get(`${this.host}/dag/get?arg=${hash}`);
+      return result.data;
     } catch (err) {
-      console.error('Error getting dag from IPFS', err)
+      console.error('Error getting dag from IPFS', err);
     }
   }
 }

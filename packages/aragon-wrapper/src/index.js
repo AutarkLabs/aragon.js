@@ -66,7 +66,6 @@ import {
   createForwarderTransactionBuilder,
   getRecommendedGasLimit
 } from './utils/transactions'
-import { listenForPinHashEvents, isStorageApp } from './utils/quasar'
 
 // Try to get an injected web3 provider, return a public one otherwise.
 export const detectProvider = () =>
@@ -193,7 +192,7 @@ export default class Aragon {
     await this.initAccounts(options.accounts)
     await this.initAcl(Object.assign({ aclAddress }, options.acl))
     await this.initIdentityProviders()
-    this.initApps(options.datastore)
+    this.initApps()
     this.initForwarders()
     this.initAppIdentifiers()
     this.initNetwork()
@@ -355,7 +354,7 @@ export default class Aragon {
    *
    * @return {void}
    */
-  initApps (datastore) {
+  initApps () {
     /******************************
      *                            *
      *          CACHING           *
@@ -533,8 +532,8 @@ export default class Aragon {
             }
 
             // ensure organization datastore is listening if app is a storage app
-            if (isStorageApp(appInfo)) {
-              await listenForPinHashEvents(app.proxyAddress, datastore)
+            if (this.datastore.isStorageApp(appInfo)) {
+              await this.datastore.listenToStorageApp(app.proxyAddress)
             }
 
             return {
@@ -1176,7 +1175,7 @@ export default class Aragon {
         handlers.createRequestHandler(request$, 'identify', handlers.appIdentifier),
         handlers.createRequestHandler(request$, 'address_identity', handlers.addressIdentity),
         handlers.createRequestHandler(request$, 'search_identities', handlers.searchIdentities),
-        
+
         // Datastore handlers
         handlers.createRequestHandler(request$, 'datastore', handlers.datastore)
       ).subscribe(
