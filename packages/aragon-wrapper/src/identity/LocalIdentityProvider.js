@@ -1,6 +1,7 @@
 import Cache from '../cache'
 import AddressIdentityProvider from './AddressIdentityProvider'
 
+
 /**
  * An local identity provider for addresses
  *
@@ -27,7 +28,8 @@ export default class LocalIdentityProvider extends AddressIdentityProvider {
    */
   resolve (address) {
     address = address.toLowerCase()
-    return this.identityCache.get(address)
+    const cache = this.identityCache.get(address)
+    return cache
   }
 
   /**
@@ -43,7 +45,7 @@ export default class LocalIdentityProvider extends AddressIdentityProvider {
     }
     address = address.toLowerCase()
 
-    const metadata = { name, createdAt }
+    const metadata = { name, createdAt, source: 'local' }
     // First save it in the cache
     await this.identityCache.set(address, metadata)
 
